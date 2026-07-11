@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>rawform builder</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>rawform</h1>
+    <p class="subtitle">Minimalist form builder</p>
+  </header>
+
+  <main>
+    <div id="form-meta">
+      <label>Form title <input type="text" id="form-title" placeholder="Untitled form" /></label>
+    </div>
+
+    <div id="builder">
+      <!-- Elements rendered by builder.js -->
+    </div>
+
+    <div id="add-element">
+      <select id="element-type-select">
+        <option value="">— Add element —</option>
+        <option value="text">Text input</option>
+        <option value="textarea">Textarea</option>
+        <option value="dropdown">Dropdown</option>
+        <option value="checkbox">Checkbox</option>
+      </select>
+      <button id="add-btn">Add</button>
+    </div>
+
+    <div id="actions">
+      <button id="export-btn">Export JSON</button>
+    </div>
+
+    <pre id="output"></pre>
+  </main>
+
+  <script src="/builder.js"></script>
+</body>
+</html>
