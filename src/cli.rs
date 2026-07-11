@@ -1,4 +1,3 @@
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::{
@@ -6,7 +5,7 @@ use crate::{
     db::{clients, forms},
 };
 
-pub async fn create_client(pool: &SqlitePool, name: &str) -> anyhow::Result<()> {
+pub async fn create_client(pool: &crate::db::DbPool, name: &str) -> anyhow::Result<()> {
     let api_key = format!("rawform_{}", Uuid::new_v4());
     let hash = hash_key(&api_key);
     let client = clients::insert(pool, name, &hash).await?;
@@ -16,7 +15,7 @@ pub async fn create_client(pool: &SqlitePool, name: &str) -> anyhow::Result<()> 
 }
 
 pub async fn list_forms(
-    pool: &SqlitePool,
+    pool: &crate::db::DbPool,
     client: Option<&str>,
     client_id: Option<i64>,
     name: Option<&str>,
@@ -29,8 +28,14 @@ pub async fn list_forms(
 
     for row in rows {
         println!(
-            "{:>4}  client_id={}  client={}  external_id={}  active={}",
-            row.id, row.client_id, row.client_name, row.external_id, row.is_active
+            "{:>4}  client_id={}  client={}  external_id={}  active={}  admin={}  submit={}",
+            row.id,
+            row.client_id,
+            row.client_name,
+            row.external_id,
+            row.is_active,
+            row.admin_token,
+            row.submit_token
         );
     }
 
@@ -38,7 +43,7 @@ pub async fn list_forms(
 }
 
 pub async fn create_form(
-    pool: &SqlitePool,
+    pool: &crate::db::DbPool,
     client_name: &str,
     external_id: &str,
     api_key: &str,
@@ -78,7 +83,7 @@ pub async fn create_form(
 }
 
 async fn auth(
-    pool: &SqlitePool,
+    pool: &crate::db::DbPool,
     client_name: &str,
     api_key: &str,
 ) -> anyhow::Result<crate::models::Client> {

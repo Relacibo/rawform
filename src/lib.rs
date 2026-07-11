@@ -5,10 +5,9 @@ pub mod error;
 pub mod models;
 
 use axum::Router;
-use sqlx::SqlitePool;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
-pub fn app(pool: SqlitePool) -> Router {
+pub fn app(pool: db::DbPool) -> Router {
     Router::new()
         .nest("/api/v1", api::router(pool))
         .fallback_service(ServeDir::new("static"))

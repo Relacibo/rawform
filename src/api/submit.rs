@@ -6,9 +6,12 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sqlx::SqlitePool;
 
-use crate::{db::forms, error::AppError, models::Form};
+use crate::{
+    db::{DbPool, forms},
+    error::AppError,
+    models::Form,
+};
 
 #[derive(Deserialize)]
 pub struct ClientExternalPath {
@@ -23,7 +26,7 @@ pub struct SubmitBody {
 
 /// Public: get submit_token + form data by client_name + external_id (no auth required).
 pub async fn get_token(
-    State(pool): State<SqlitePool>,
+    State(pool): State<DbPool>,
     Path(ClientExternalPath {
         client_name,
         external_id,
@@ -40,7 +43,7 @@ pub async fn get_token(
 
 /// Public: get form definition by submit_token.
 pub async fn get_form(
-    State(pool): State<SqlitePool>,
+    State(pool): State<DbPool>,
     Path(submit_token): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     let view = forms::find_by_submit_token(&pool, &submit_token)
@@ -56,7 +59,7 @@ pub async fn get_form(
 
 /// Public: submit form values.
 pub async fn post_submit(
-    State(pool): State<SqlitePool>,
+    State(pool): State<DbPool>,
     Path(submit_token): Path<String>,
     Json(body): Json<SubmitBody>,
 ) -> Result<impl IntoResponse, AppError> {

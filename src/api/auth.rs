@@ -1,8 +1,11 @@
 use axum::http::HeaderMap;
 use sha2::{Digest, Sha256};
-use sqlx::SqlitePool;
 
-use crate::{db::clients, error::AppError, models::Client};
+use crate::{
+    db::{DbPool, clients},
+    error::AppError,
+    models::Client,
+};
 
 pub fn extract_bearer(headers: &HeaderMap) -> Option<String> {
     headers
@@ -19,7 +22,7 @@ pub fn hash_key(key: &str) -> String {
 }
 
 pub async fn authenticate_client(
-    pool: &SqlitePool,
+    pool: &DbPool,
     headers: &HeaderMap,
     client_name: &str,
 ) -> Result<Client, AppError> {

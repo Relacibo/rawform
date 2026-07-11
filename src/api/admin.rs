@@ -5,10 +5,10 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sqlx::SqlitePool;
 
 use super::serde_util::deserialize_maybe;
 use crate::{
+    db::DbPool,
     db::forms::{self, FormPatch},
     error::AppError,
     models::Form,
@@ -43,7 +43,7 @@ fn form_json(v: &Form) -> Result<Value, AppError> {
 }
 
 pub async fn get_form(
-    State(pool): State<SqlitePool>,
+    State(pool): State<DbPool>,
     Path(admin_token): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     let view = forms::find_by_admin_token(&pool, &admin_token)
@@ -53,7 +53,7 @@ pub async fn get_form(
 }
 
 pub async fn put_form(
-    State(pool): State<SqlitePool>,
+    State(pool): State<DbPool>,
     Path(admin_token): Path<String>,
     Json(body): Json<PutAdminBody>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -75,7 +75,7 @@ pub async fn put_form(
 }
 
 pub async fn patch_form(
-    State(pool): State<SqlitePool>,
+    State(pool): State<DbPool>,
     Path(admin_token): Path<String>,
     Json(body): Json<PatchAdminBody>,
 ) -> Result<impl IntoResponse, AppError> {

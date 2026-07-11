@@ -6,11 +6,11 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use super::{auth::authenticate_client, serde_util::deserialize_maybe};
 use crate::{
+    db::DbPool,
     db::forms::{self, FormPatch},
     error::AppError,
     models::Form,
@@ -52,7 +52,7 @@ fn form_json(v: &Form) -> Result<Value, AppError> {
 }
 
 pub async fn put_form(
-    State(pool): State<SqlitePool>,
+    State(pool): State<DbPool>,
     headers: HeaderMap,
     Path(FormPath {
         client_name,
@@ -79,7 +79,7 @@ pub async fn put_form(
 }
 
 pub async fn get_form(
-    State(pool): State<SqlitePool>,
+    State(pool): State<DbPool>,
     headers: HeaderMap,
     Path(FormPath {
         client_name,
@@ -94,7 +94,7 @@ pub async fn get_form(
 }
 
 pub async fn patch_form(
-    State(pool): State<SqlitePool>,
+    State(pool): State<DbPool>,
     headers: HeaderMap,
     Path(FormPath {
         client_name,
@@ -123,7 +123,7 @@ pub async fn patch_form(
 }
 
 pub async fn delete_form(
-    State(pool): State<SqlitePool>,
+    State(pool): State<DbPool>,
     headers: HeaderMap,
     Path(FormPath {
         client_name,

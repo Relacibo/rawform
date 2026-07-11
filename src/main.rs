@@ -14,7 +14,8 @@ use rawform::{app, cli, db};
 )]
 struct Cli {
     /// SQLite or PostgreSQL connection URL
-    #[arg(long, env = "DATABASE_URL", default_value = "sqlite://rawform.db")]
+    #[cfg_attr(feature = "sqlite", arg(long, env = "DATABASE_URL", default_value = "sqlite://rawform.db"))]
+    #[cfg_attr(feature = "postgres", arg(long, env = "DATABASE_URL", default_value = "postgres://postgres:postgres@localhost/rawform"))]
     database_url: String,
 
     /// Address to listen on

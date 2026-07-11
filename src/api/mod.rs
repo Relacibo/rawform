@@ -8,9 +8,8 @@ use axum::{
     Router,
     routing::{delete, get, patch, post, put},
 };
-use sqlx::SqlitePool;
 
-pub fn router(pool: SqlitePool) -> Router {
+pub fn router(pool: crate::db::DbPool) -> Router {
     Router::new()
         // Form instances (client auth)
         .route("/forms/{client_name}/{external_id}", put(forms::put_form))

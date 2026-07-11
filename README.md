@@ -4,6 +4,11 @@
 
 A minimalist, self-hostable form builder with a REST API. Forms are created and updated directly; there are no standalone definition endpoints.
 
+The backend is selected at compile time with Cargo features:
+
+- `sqlite` (default)
+- `postgres`
+
 ## Features
 
 - Create and manage forms via REST API
@@ -27,6 +32,9 @@ cp .env.example .env
 
 # create client (prints API key once)
 cargo run -- client myapp
+
+# build/run with PostgreSQL instead of SQLite
+cargo run --no-default-features --features postgres
 
 # create or upsert form
 cargo run -- form myapp contact-form --api-key rawform_... --data '{"title":"Contact","elements":[]}'
@@ -88,3 +96,7 @@ Commands:
 ## License
 
 MIT — see [LICENSE](./LICENSE).
+
+## Integrations
+
+- Activepieces piece scaffold: [`integrations/activepieces`](./integrations/activepieces)
