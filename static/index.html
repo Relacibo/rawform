@@ -13,13 +13,39 @@
   </header>
 
   <main>
+    <!-- Connection -->
+    <section id="connection">
+      <div class="conn-fields">
+        <label>Client <input id="client-name" type="text" placeholder="myapp" /></label>
+        <label>Form ID <input id="external-id" type="text" placeholder="contact-form" /></label>
+        <label>API Key <input id="api-key" type="password" placeholder="rawform_..." /></label>
+      </div>
+      <div class="conn-actions">
+        <button id="load-btn">Load</button>
+        <button id="save-btn">Save</button>
+        <span id="save-status"></span>
+      </div>
+      <div id="token-display" hidden>
+        <div class="token-row">
+          <span class="token-label">Admin token</span>
+          <code id="admin-token-val"></code>
+          <button class="copy-btn" data-target="admin-token-val">Copy</button>
+        </div>
+        <div class="token-row">
+          <span class="token-label">Submit token</span>
+          <code id="submit-token-val"></code>
+          <button class="copy-btn" data-target="submit-token-val">Copy</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Form meta -->
     <div id="form-meta">
       <label>Form title <input type="text" id="form-title" placeholder="Untitled form" /></label>
     </div>
 
-    <div id="builder">
-      <!-- Elements rendered by builder.js -->
-    </div>
+    <!-- Builder -->
+    <div id="builder"></div>
 
     <div id="add-element">
       <select id="element-type-select">
@@ -37,6 +63,8 @@
       <button id="export-btn">Export JSON</button>
       <button id="preview-btn">Preview</button>
     </div>
+
+    <pre id="output"></pre>
   </main>
 
   <!-- Import dialog -->
@@ -53,7 +81,7 @@
   <!-- Preview dialog -->
   <dialog id="preview-dialog">
     <h2 id="preview-title">Preview</h2>
-    <div id="preview-form"></div>
+    <form id="preview-form" onsubmit="return false"></form>
     <div class="dialog-actions">
       <button id="preview-close-btn">Close</button>
     </div>

@@ -1,11 +1,37 @@
-// rawform builder.js — minimal form builder UI
-// render() is only called for structural changes (add/delete/reorder/options).
-// Text field edits update state + targeted DOM nodes directly to preserve focus.
+// rawform builder.js
+// render() is only called for structural changes. Text edits patch DOM directly.
 
 const state = { elements: [] };
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
 function slugify(str) {
   return str.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+}
+
+function buildSchema() {
+  return {
+    title: document.getElementById('form-title').value || null,
+    elements: state.elements.map(({ id, nameOverridden, ...el }) => {
+      if (el.options) {
+        el.options = el.options.map(({ valueOverridden, ...opt }) => opt);
+      }
+      return el;
+    }),
+  };
+}
+
+function loadFromSchema(schema) {
+  document.getElementById('form-title').value = schema.title ?? '';
+  state.elements = (schema.elements ?? []).map(el => ({
+    ...el,
+    id: crypto.randomUUID(),
+    nameOverridden: true,
+    ...(el.options ? {
+      options: el.options.map(o => ({ ...o, valueOverridden: true })),
+    } : {}),
+  }));
+  render();
 }
 
 // ── Structural mutations (trigger full re-render) ──────────────────────────
@@ -13,16 +39,11 @@ function slugify(str) {
 function addElement(type) {
   const base = { id: crypto.randomUUID(), type, label: '', name: '', nameOverridden: false, required: false };
   switch (type) {
-    case 'text':
-    case 'textarea':
-    case 'checkbox':
-      state.elements.push({ ...base, placeholder: '' });
-      break;
+    case 'text': case 'textarea': case 'checkbox':
+      state.elements.push({ ...base, placeholder: '' }); break;
     case 'dropdown':
-      state.elements.push({ ...base, options: [] });
-      break;
-    default:
-      return;
+      state.elements.push({ ...base, options: [] }); break;
+    default: return;
   }
   render();
 }
@@ -54,9 +75,8 @@ function removeOption(id, idx) {
   render();
 }
 
-// ── In-place state updates (no re-render, targeted DOM patch) ─────────────
+// ── In-place state updates (no re-render) ─────────────────────────────────
 
-/** Update a scalar field on an element. Syncs derived `name` field in DOM. */
 function updateField(id, field, value) {
   const el = state.elements.find(e => e.id === id);
   if (!el) return;
@@ -68,7 +88,6 @@ function updateField(id, field, value) {
   }
 }
 
-/** Update a scalar field on a dropdown option. Syncs derived `value` in DOM. */
 function updateOption(id, idx, field, value) {
   const el = state.elements.find(e => e.id === id);
   if (!el) return;
@@ -81,7 +100,7 @@ function updateOption(id, idx, field, value) {
   }
 }
 
-// ── DOM helpers ───────────────────────────────────────────────────────────
+// ── DOM builders ──────────────────────────────────────────────────────────
 
 function makeField(labelText, input) {
   const row = document.createElement('div');
@@ -122,7 +141,6 @@ function makeNameRow(el) {
   inp.placeholder = 'derived from label';
   inp.dataset.el = el.id;
   inp.dataset.field = 'name';
-
   inp.addEventListener('input', e => {
     el.name = e.target.value;
     el.nameOverridden = e.target.value !== '' && e.target.value !== slugify(el.label);
@@ -158,7 +176,6 @@ function makeOptionsBuilder(el) {
   title.textContent = 'Options';
   container.appendChild(title);
 
-  // Column headers (shown once above the rows)
   const headers = document.createElement('div');
   headers.className = 'option-row option-headers';
   ['Label', 'Value', '', ''].forEach(text => {
@@ -181,7 +198,7 @@ function makeOptionsBuilder(el) {
     const valueInp = document.createElement('input');
     valueInp.type = 'text';
     valueInp.value = opt.value;
-    valueInp.placeholder = 'value (derived)';
+    valueInp.placeholder = 'derived';
     valueInp.title = 'Override the submitted value';
     valueInp.dataset.el = el.id;
     valueInp.dataset.opt = idx;
@@ -225,7 +242,6 @@ function makeOptionsBuilder(el) {
   addBtn.className = 'add-option-btn';
   addBtn.addEventListener('click', () => addOption(el.id));
   container.appendChild(addBtn);
-
   return container;
 }
 
@@ -239,12 +255,10 @@ function renderCard(el) {
   const orderBtns = document.createElement('div');
   orderBtns.className = 'order-btns';
   const upBtn = document.createElement('button');
-  upBtn.textContent = '▲';
-  upBtn.title = 'Move up';
+  upBtn.textContent = '▲'; upBtn.title = 'Move up';
   upBtn.addEventListener('click', () => moveElement(el.id, -1));
   const downBtn = document.createElement('button');
-  downBtn.textContent = '▼';
-  downBtn.title = 'Move down';
+  downBtn.textContent = '▼'; downBtn.title = 'Move down';
   downBtn.addEventListener('click', () => moveElement(el.id, 1));
   orderBtns.appendChild(upBtn);
   orderBtns.appendChild(downBtn);
@@ -255,8 +269,7 @@ function renderCard(el) {
 
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'delete-btn';
-  deleteBtn.textContent = '✕';
-  deleteBtn.title = 'Delete element';
+  deleteBtn.textContent = '✕'; deleteBtn.title = 'Delete element';
   deleteBtn.addEventListener('click', () => removeElement(el.id));
 
   header.appendChild(orderBtns);
@@ -267,8 +280,7 @@ function renderCard(el) {
   const fields = document.createElement('div');
   fields.className = 'fields';
 
-  const labelInp = makeInput('text', el.label, v => updateField(el.id, 'label', v));
-  fields.appendChild(makeField('Label', labelInp));
+  fields.appendChild(makeField('Label', makeInput('text', el.label, v => updateField(el.id, 'label', v))));
   fields.appendChild(makeNameRow(el));
 
   if (el.type === 'text' || el.type === 'textarea') {
@@ -277,12 +289,9 @@ function renderCard(el) {
     fields.appendChild(makeField('Placeholder', phInp));
   }
 
-  if (el.type === 'dropdown') {
-    fields.appendChild(makeOptionsBuilder(el));
-  }
+  if (el.type === 'dropdown') fields.appendChild(makeOptionsBuilder(el));
 
   fields.appendChild(makeField('Required', makeInput('checkbox', el.required, v => updateField(el.id, 'required', v))));
-
   card.appendChild(fields);
   return card;
 }
@@ -293,25 +302,180 @@ function render() {
   state.elements.forEach(el => builder.appendChild(renderCard(el)));
 }
 
-function exportJSON() {
-  const title = document.getElementById('form-title').value || null;
-  const output = {
-    title,
-    elements: state.elements.map(({ id, nameOverridden, ...el }) => {
-      if (el.options) {
-        el.options = el.options.map(({ valueOverridden, ...opt }) => opt);
+// ── Preview ───────────────────────────────────────────────────────────────
+
+function buildPreviewForm() {
+  const form = document.getElementById('preview-form');
+  form.innerHTML = '';
+  state.elements.forEach(el => {
+    const group = document.createElement('div');
+    group.className = 'preview-group';
+
+    if (el.type === 'checkbox') {
+      const lbl = document.createElement('label');
+      lbl.className = 'preview-checkbox-label';
+      const inp = document.createElement('input');
+      inp.type = 'checkbox';
+      inp.name = el.name;
+      if (el.required) inp.required = true;
+      lbl.appendChild(inp);
+      lbl.append(' ' + (el.label || el.name));
+      group.appendChild(lbl);
+    } else {
+      const lbl = document.createElement('label');
+      lbl.textContent = el.label || el.name;
+      if (el.required) {
+        const req = document.createElement('span');
+        req.textContent = ' *'; req.className = 'preview-required';
+        lbl.appendChild(req);
       }
-      return el;
-    }),
+      group.appendChild(lbl);
+
+      let inp;
+      if (el.type === 'textarea') {
+        inp = document.createElement('textarea');
+        inp.placeholder = el.placeholder ?? '';
+      } else if (el.type === 'dropdown') {
+        inp = document.createElement('select');
+        const empty = document.createElement('option');
+        empty.value = ''; empty.textContent = '— Select —';
+        inp.appendChild(empty);
+        (el.options ?? []).forEach(o => {
+          const opt = document.createElement('option');
+          opt.value = o.value; opt.textContent = o.label;
+          inp.appendChild(opt);
+        });
+      } else {
+        inp = document.createElement('input');
+        inp.type = 'text';
+        inp.placeholder = el.placeholder ?? '';
+      }
+      inp.name = el.name;
+      if (el.required) inp.required = true;
+      group.appendChild(inp);
+    }
+    form.appendChild(group);
+  });
+}
+
+// ── API ───────────────────────────────────────────────────────────────────
+
+function connFields() {
+  return {
+    client: document.getElementById('client-name').value.trim(),
+    externalId: document.getElementById('external-id').value.trim(),
+    apiKey: document.getElementById('api-key').value.trim(),
   };
+}
+
+function setStatus(msg, isError = false) {
+  const el = document.getElementById('save-status');
+  el.textContent = msg;
+  el.className = isError ? 'status-error' : 'status-ok';
+}
+
+function showTokens(adminToken, submitToken) {
+  document.getElementById('admin-token-val').textContent = adminToken;
+  document.getElementById('submit-token-val').textContent = submitToken;
+  document.getElementById('token-display').hidden = false;
+}
+
+async function saveForm() {
+  const { client, externalId, apiKey } = connFields();
+  if (!client || !externalId || !apiKey) {
+    setStatus('Fill in Client, Form ID and API Key', true); return;
+  }
+  setStatus('Saving…');
+  try {
+    const res = await fetch(`/api/v1/forms/${encodeURIComponent(client)}/${encodeURIComponent(externalId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ data: buildSchema() }),
+    });
+    const json = await res.json();
+    if (!res.ok) { setStatus(json.error ?? 'Error', true); return; }
+    setStatus('Saved ✓');
+    showTokens(json.admin_token, json.submit_token);
+  } catch (e) {
+    setStatus('Network error', true);
+  }
+}
+
+async function loadForm() {
+  const { client, externalId, apiKey } = connFields();
+  if (!client || !externalId || !apiKey) {
+    setStatus('Fill in Client, Form ID and API Key', true); return;
+  }
+  setStatus('Loading…');
+  try {
+    const res = await fetch(`/api/v1/forms/${encodeURIComponent(client)}/${encodeURIComponent(externalId)}`, {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+    const json = await res.json();
+    if (!res.ok) { setStatus(json.error ?? 'Error', true); return; }
+    loadFromSchema(json.data);
+    setStatus('Loaded ✓');
+    showTokens(json.admin_token, json.submit_token);
+  } catch (e) {
+    setStatus('Network error', true);
+  }
+}
+
+// ── Export JSON ───────────────────────────────────────────────────────────
+
+function exportJSON() {
   const pre = document.getElementById('output');
   pre.style.display = 'block';
-  pre.textContent = JSON.stringify(output, null, 2);
+  pre.textContent = JSON.stringify(buildSchema(), null, 2);
 }
+
+// ── Event listeners ───────────────────────────────────────────────────────
 
 document.getElementById('add-btn').addEventListener('click', () => {
   const sel = document.getElementById('element-type-select');
   if (sel.value) { addElement(sel.value); sel.value = ''; }
 });
 
+document.getElementById('save-btn').addEventListener('click', saveForm);
+document.getElementById('load-btn').addEventListener('click', loadForm);
 document.getElementById('export-btn').addEventListener('click', exportJSON);
+
+// Import dialog
+const importDialog = document.getElementById('import-dialog');
+document.getElementById('import-btn').addEventListener('click', () => {
+  document.getElementById('import-error').textContent = '';
+  importDialog.showModal();
+});
+document.getElementById('import-cancel-btn').addEventListener('click', () => importDialog.close());
+document.getElementById('import-confirm-btn').addEventListener('click', () => {
+  const raw = document.getElementById('import-textarea').value;
+  try {
+    const schema = JSON.parse(raw);
+    loadFromSchema(schema);
+    importDialog.close();
+  } catch {
+    document.getElementById('import-error').textContent = 'Invalid JSON';
+  }
+});
+
+// Preview dialog
+const previewDialog = document.getElementById('preview-dialog');
+document.getElementById('preview-btn').addEventListener('click', () => {
+  document.getElementById('preview-title').textContent =
+    document.getElementById('form-title').value || 'Preview';
+  buildPreviewForm();
+  previewDialog.showModal();
+});
+document.getElementById('preview-close-btn').addEventListener('click', () => previewDialog.close());
+
+// Copy buttons
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+  const text = document.getElementById(btn.dataset.target)?.textContent ?? '';
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+});
