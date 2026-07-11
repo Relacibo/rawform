@@ -1,18 +1,21 @@
 use axum::{
+    Json,
     extract::{Path, State},
     response::IntoResponse,
-    Json,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::SqlitePool;
 
+use super::serde_util::deserialize_maybe;
 use crate::{
-    db::{definitions, instances::{self, InstancePatch}},
+    db::{
+        definitions,
+        instances::{self, InstancePatch},
+    },
     error::AppError,
     models::InstanceView,
 };
-use super::serde_util::deserialize_maybe;
 
 #[derive(Deserialize)]
 pub struct PutAdminBody {
@@ -63,11 +66,16 @@ pub async fn put_form(
         .ok_or(AppError::NotFound)?;
     let data = serde_json::to_string(&body.data).unwrap();
     let def = definitions::insert(&pool, view.client_id, &data).await?;
-    let updated = instances::patch(&pool, view.id, InstancePatch {
-        definition_id: Some(def.id),
-        webhook_url: body.webhook_url,
-        is_active: None,
-    }).await?;
+    let updated = instances::patch(
+        &pool,
+        view.id,
+        InstancePatch {
+            definition_id: Some(def.id),
+            webhook_url: body.webhook_url,
+            is_active: None,
+        },
+    )
+    .await?;
     Ok(Json(instance_json(&updated)?))
 }
 
@@ -88,10 +96,15 @@ pub async fn patch_form(
         None
     };
 
-    let updated = instances::patch(&pool, view.id, InstancePatch {
-        definition_id,
-        webhook_url: body.webhook_url,
-        is_active: body.is_active,
-    }).await?;
+    let updated = instances::patch(
+        &pool,
+        view.id,
+        InstancePatch {
+            definition_id,
+            webhook_url: body.webhook_url,
+            is_active: body.is_active,
+        },
+    )
+    .await?;
     Ok(Json(instance_json(&updated)?))
 }

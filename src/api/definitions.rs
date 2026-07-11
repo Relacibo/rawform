@@ -5,8 +5,8 @@ use axum::{
 };
 use sqlx::SqlitePool;
 
-use crate::{db::definitions, error::AppError};
 use super::auth::authenticate_client;
+use crate::{db::definitions, error::AppError};
 
 #[derive(serde::Deserialize)]
 pub struct DefinitionPath {
@@ -17,7 +17,10 @@ pub struct DefinitionPath {
 pub async fn delete_definition(
     State(pool): State<SqlitePool>,
     headers: axum::http::HeaderMap,
-    Path(DefinitionPath { client_name, definition_id }): Path<DefinitionPath>,
+    Path(DefinitionPath {
+        client_name,
+        definition_id,
+    }): Path<DefinitionPath>,
 ) -> Result<impl IntoResponse, AppError> {
     let client = authenticate_client(&pool, &headers, &client_name).await?;
 

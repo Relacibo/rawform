@@ -9,8 +9,10 @@ use rawform::{app, cli, config::Config, db};
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "rawform=debug,tower_http=debug".into()))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "rawform=debug,tower_http=debug".into()),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
@@ -19,7 +21,8 @@ async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(|s| s.as_str()) {
         Some("create-client") => {
-            let name = args.get(1)
+            let name = args
+                .get(1)
                 .ok_or_else(|| anyhow::anyhow!("Usage: rawform create-client <name>"))?;
             let pool = db::connect(&config.database_url).await?;
             db::migrate(&pool).await?;

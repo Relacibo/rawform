@@ -1,8 +1,8 @@
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -24,7 +24,10 @@ pub struct SubmitBody {
 /// Public: get submit_token + form data by client_name + external_id (no auth required).
 pub async fn get_token(
     State(pool): State<SqlitePool>,
-    Path(ClientExternalPath { client_name, external_id }): Path<ClientExternalPath>,
+    Path(ClientExternalPath {
+        client_name,
+        external_id,
+    }): Path<ClientExternalPath>,
 ) -> Result<impl IntoResponse, AppError> {
     let view = instances::find_by_client_name_and_external(&pool, &client_name, &external_id)
         .await?
@@ -65,7 +68,10 @@ pub async fn post_submit(
         fire_webhook(url, &view, &body.values);
     }
 
-    Ok((StatusCode::ACCEPTED, Json(json!({ "ok": true, "form_id": view.id }))))
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({ "ok": true, "form_id": view.id })),
+    ))
 }
 
 fn fire_webhook(url: String, view: &InstanceView, values: &Value) {
@@ -78,12 +84,11 @@ fn fire_webhook(url: String, view: &InstanceView, values: &Value) {
     tokio::spawn(async move {
         let client = reqwest::Client::new();
         match client.post(&url).json(&payload).send().await {
-            Ok(r) if r.status().is_success() =>
-                tracing::debug!("Webhook delivered to {url}: {}", r.status()),
-            Ok(r) =>
-                tracing::warn!("Webhook to {url} returned non-success: {}", r.status()),
-            Err(e) =>
-                tracing::warn!("Webhook to {url} failed: {e}"),
+            Ok(r) if r.status().is_success() => {
+                tracing::debug!("Webhook delivered to {url}: {}", r.status())
+            }
+            Ok(r) => tracing::warn!("Webhook to {url} returned non-success: {}", r.status()),
+            Err(e) => tracing::warn!("Webhook to {url} failed: {e}"),
         }
     });
 }

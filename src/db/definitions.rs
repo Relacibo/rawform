@@ -39,12 +39,10 @@ pub async fn list_by_client(pool: &SqlitePool, client_id: i64) -> sqlx::Result<V
 /// Returns true if a row was deleted, false if not found.
 /// Fails with FK error if the definition is still referenced by a form instance.
 pub async fn delete(pool: &SqlitePool, id: i64, client_id: i64) -> sqlx::Result<bool> {
-    let result = sqlx::query(
-        "DELETE FROM form_definitions WHERE id = ? AND client_id = ?",
-    )
-    .bind(id)
-    .bind(client_id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("DELETE FROM form_definitions WHERE id = ? AND client_id = ?")
+        .bind(id)
+        .bind(client_id)
+        .execute(pool)
+        .await?;
     Ok(result.rows_affected() > 0)
 }
