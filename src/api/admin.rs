@@ -8,9 +8,9 @@ use serde_json::{Value, json};
 use sqlx::SqlitePool;
 
 use crate::{
-    db::forms::{self, FormPatch},
+    db::{definitions, instances::{self, InstancePatch}},
     error::AppError,
-    models::Form,
+    models::InstanceView,
 };
 use super::serde_util::deserialize_maybe;
 
@@ -29,16 +29,17 @@ pub struct PatchAdminBody {
     pub is_active: Option<bool>,
 }
 
-fn form_json(form: &Form) -> Result<Value, AppError> {
+fn instance_json(v: &InstanceView) -> Result<Value, AppError> {
     Ok(json!({
-        "id": form.id,
-        "external_id": form.external_id,
-        "data": form.data_json()?,
-        "is_active": form.is_active,
-        "webhook_url": form.webhook_url,
-        "submit_token": form.submit_token,
-        "created_at": form.created_at,
-        "updated_at": form.updated_at,
+        "id": v.id,
+        "external_id": v.external_id,
+        "definition_id": v.definition_id,
+        "data": v.data_json()?,
+        "is_active": v.is_active,
+        "webhook_url": v.webhook_url,
+        "submit_token": v.submit_token,
+        "created_at": v.created_at,
+        "updated_at": v.updated_at,
     }))
 }
 
@@ -46,10 +47,10 @@ pub async fn get_form(
     State(pool): State<SqlitePool>,
     Path(admin_token): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    let form = forms::find_by_admin_token(&pool, &admin_token)
+    let view = instances::find_by_admin_token(&pool, &admin_token)
         .await?
         .ok_or(AppError::NotFound)?;
-    Ok(Json(form_json(&form)?))
+    Ok(Json(instance_json(&view)?))
 }
 
 pub async fn put_form(
@@ -57,13 +58,17 @@ pub async fn put_form(
     Path(admin_token): Path<String>,
     Json(body): Json<PutAdminBody>,
 ) -> Result<impl IntoResponse, AppError> {
-    let form = forms::find_by_admin_token(&pool, &admin_token)
+    let view = instances::find_by_admin_token(&pool, &admin_token)
         .await?
         .ok_or(AppError::NotFound)?;
     let data = serde_json::to_string(&body.data).unwrap();
-    let webhook_url = body.webhook_url.flatten();
-    let updated = forms::replace(&pool, form.id, &data, webhook_url.as_deref()).await?;
-    Ok(Json(form_json(&updated)?))
+    let def = definitions::insert(&pool, view.client_id, &data).await?;
+    let updated = instances::patch(&pool, view.id, InstancePatch {
+        definition_id: Some(def.id),
+        webhook_url: body.webhook_url,
+        is_active: None,
+    }).await?;
+    Ok(Json(instance_json(&updated)?))
 }
 
 pub async fn patch_form(
@@ -71,18 +76,22 @@ pub async fn patch_form(
     Path(admin_token): Path<String>,
     Json(body): Json<PatchAdminBody>,
 ) -> Result<impl IntoResponse, AppError> {
-    let form = forms::find_by_admin_token(&pool, &admin_token)
+    let view = instances::find_by_admin_token(&pool, &admin_token)
         .await?
         .ok_or(AppError::NotFound)?;
-    let updated = forms::patch(
-        &pool,
-        form.id,
-        FormPatch {
-            data: body.data.as_ref().map(|v| serde_json::to_string(v).unwrap()),
-            webhook_url: body.webhook_url,
-            is_active: body.is_active,
-        },
-    )
-    .await?;
-    Ok(Json(form_json(&updated)?))
+
+    let definition_id = if let Some(data_val) = &body.data {
+        let data = serde_json::to_string(data_val).unwrap();
+        let def = definitions::insert(&pool, view.client_id, &data).await?;
+        Some(def.id)
+    } else {
+        None
+    };
+
+    let updated = instances::patch(&pool, view.id, InstancePatch {
+        definition_id,
+        webhook_url: body.webhook_url,
+        is_active: body.is_active,
+    }).await?;
+    Ok(Json(instance_json(&updated)?))
 }

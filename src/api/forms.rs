@@ -10,9 +10,9 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::{
-    db::forms::{self, FormPatch},
+    db::{definitions, instances::{self, InstancePatch}},
     error::AppError,
-    models::Form,
+    models::InstanceView,
 };
 use super::{auth::authenticate_client, serde_util::deserialize_maybe};
 
@@ -37,17 +37,18 @@ pub struct PatchFormBody {
     pub is_active: Option<bool>,
 }
 
-fn form_json(form: &Form) -> Result<Value, AppError> {
+fn instance_json(v: &InstanceView) -> Result<Value, AppError> {
     Ok(json!({
-        "id": form.id,
-        "external_id": form.external_id,
-        "data": form.data_json()?,
-        "is_active": form.is_active,
-        "webhook_url": form.webhook_url,
-        "admin_token": form.admin_token,
-        "submit_token": form.submit_token,
-        "created_at": form.created_at,
-        "updated_at": form.updated_at,
+        "id": v.id,
+        "external_id": v.external_id,
+        "definition_id": v.definition_id,
+        "data": v.data_json()?,
+        "is_active": v.is_active,
+        "webhook_url": v.webhook_url,
+        "admin_token": v.admin_token,
+        "submit_token": v.submit_token,
+        "created_at": v.created_at,
+        "updated_at": v.updated_at,
     }))
 }
 
@@ -59,20 +60,15 @@ pub async fn put_form(
 ) -> Result<impl IntoResponse, AppError> {
     let client = authenticate_client(&pool, &headers, &client_name).await?;
     let data = serde_json::to_string(&body.data).unwrap();
+    let def = definitions::insert(&pool, client.id, &data).await?;
     let webhook_url = body.webhook_url.flatten();
     let admin_token = Uuid::new_v4().to_string();
     let submit_token = Uuid::new_v4().to_string();
-    let form = forms::upsert(
-        &pool,
-        client.id,
-        &external_id,
-        &data,
-        &admin_token,
-        &submit_token,
-        webhook_url.as_deref(),
-    )
-    .await?;
-    Ok((StatusCode::OK, Json(form_json(&form)?)))
+    let view = instances::upsert(
+        &pool, client.id, &external_id, def.id,
+        &admin_token, &submit_token, webhook_url.as_deref(),
+    ).await?;
+    Ok((StatusCode::OK, Json(instance_json(&view)?)))
 }
 
 pub async fn get_form(
@@ -81,10 +77,10 @@ pub async fn get_form(
     Path(FormPath { client_name, external_id }): Path<FormPath>,
 ) -> Result<impl IntoResponse, AppError> {
     let client = authenticate_client(&pool, &headers, &client_name).await?;
-    let form = forms::find_by_client_and_external(&pool, client.id, &external_id)
+    let view = instances::find_by_client_and_external(&pool, client.id, &external_id)
         .await?
         .ok_or(AppError::NotFound)?;
-    Ok(Json(form_json(&form)?))
+    Ok(Json(instance_json(&view)?))
 }
 
 pub async fn patch_form(
@@ -94,19 +90,35 @@ pub async fn patch_form(
     Json(body): Json<PatchFormBody>,
 ) -> Result<impl IntoResponse, AppError> {
     let client = authenticate_client(&pool, &headers, &client_name).await?;
-    let form = forms::find_by_client_and_external(&pool, client.id, &external_id)
+    let view = instances::find_by_client_and_external(&pool, client.id, &external_id)
         .await?
         .ok_or(AppError::NotFound)?;
 
-    let updated = forms::patch(
-        &pool,
-        form.id,
-        FormPatch {
-            data: body.data.as_ref().map(|v| serde_json::to_string(v).unwrap()),
-            webhook_url: body.webhook_url,
-            is_active: body.is_active,
-        },
-    )
-    .await?;
-    Ok(Json(form_json(&updated)?))
+    let definition_id = if let Some(data_val) = &body.data {
+        let data = serde_json::to_string(data_val).unwrap();
+        let def = definitions::insert(&pool, client.id, &data).await?;
+        Some(def.id)
+    } else {
+        None
+    };
+
+    let updated = instances::patch(&pool, view.id, InstancePatch {
+        definition_id,
+        webhook_url: body.webhook_url,
+        is_active: body.is_active,
+    }).await?;
+    Ok(Json(instance_json(&updated)?))
+}
+
+pub async fn delete_form(
+    State(pool): State<SqlitePool>,
+    headers: HeaderMap,
+    Path(FormPath { client_name, external_id }): Path<FormPath>,
+) -> Result<impl IntoResponse, AppError> {
+    let client = authenticate_client(&pool, &headers, &client_name).await?;
+    let view = instances::find_by_client_and_external(&pool, client.id, &external_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    instances::delete(&pool, view.id, client.id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }

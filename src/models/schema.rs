@@ -1,29 +1,8 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct Form {
-    pub id: i64,
-    pub data: String, // stored as JSON string; parse to Value when needed
-    pub is_active: bool,
-    pub client_id: i64,
-    pub external_id: String,
-    pub admin_token: String,
-    pub submit_token: String,
-    pub webhook_url: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-impl Form {
-    pub fn data_json(&self) -> anyhow::Result<Value> {
-        Ok(serde_json::from_str::<Value>(&self.data)?)
-    }
-}
-
-/// Shape of the `data` field — the actual form definition
+/// The JSON structure stored in form_definitions.data.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct FormDefinition {
+pub struct FormSchema {
     pub title: Option<String>,
     pub elements: Vec<FormElement>,
 }
@@ -35,13 +14,13 @@ pub enum FormElement {
     Textarea(TextareaElement),
     Dropdown(DropdownElement),
     Checkbox(CheckboxElement),
-    // TODO: add more element types
+    // TODO: number, date, email, radio, file
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextElement {
     pub label: String,
-    pub name: String, // derived from label, overridable
+    pub name: String,
     pub required: bool,
     pub placeholder: Option<String>,
 }
@@ -65,7 +44,7 @@ pub struct DropdownElement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DropdownOption {
     pub label: String,
-    pub value: String, // derived from label, overridable
+    pub value: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
