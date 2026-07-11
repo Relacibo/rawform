@@ -1,6 +1,6 @@
 # rawform
 
-> ⚠️ **Note:** This project was largely vibecoded. Expect rough edges, missing validations, and evolving APIs. Contributions welcome.
+> ⚠️ **Note:** This project was largely implemented with the help of AI. Expect rough edges, missing validations, and evolving APIs. Contributions welcome.
 
 A minimalist, self-hostable form builder with a REST API. Designed to integrate with automation tools like [Activepieces](https://www.activepieces.com/).
 
