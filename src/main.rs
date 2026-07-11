@@ -36,6 +36,19 @@ enum Command {
         /// Unique client name
         name: String,
     },
+    /// Create a new form (as a client would via API)
+    CreateForm {
+        /// Client name
+        client_name: String,
+        /// External form ID (unique within the client)
+        external_id: String,
+        /// Client API key for authentication
+        #[arg(long)]
+        api_key: String,
+        /// Optional webhook URL called on each submission
+        #[arg(long)]
+        webhook_url: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -56,6 +69,21 @@ async fn main() -> anyhow::Result<()> {
     match args.command {
         Some(Command::CreateClient { name }) => {
             cli::create_client(&pool, &name).await?;
+        }
+        Some(Command::CreateForm {
+            client_name,
+            external_id,
+            api_key,
+            webhook_url,
+        }) => {
+            cli::create_form(
+                &pool,
+                &client_name,
+                &external_id,
+                &api_key,
+                webhook_url.as_deref(),
+            )
+            .await?;
         }
         None => {
             let addr: SocketAddr = format!("{}:{}", args.host, args.port).parse()?;
