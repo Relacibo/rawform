@@ -2,7 +2,7 @@
 
 > ⚠️ **Note:** This project was largely implemented with the help of AI. Expect rough edges, missing validations, and evolving APIs.
 
-A minimalist, self-hostable form builder with a REST API.
+A minimalist, self-hostable form builder with a REST API. Forms are created and updated directly; there are no standalone definition endpoints.
 
 ## Features
 
@@ -46,6 +46,9 @@ Commands:
 
   form <client_name> <external_id> --api-key <key> [--data <json>] [--webhook-url <url>]
     Create/upsert a form instance. Prints admin_token, submit_token and URLs.
+
+  forms list [--client <name>] [--client-id <id>] [--name <external_id>]
+    List forms and optionally filter by client name, client id, or external id.
 ```
 
 ## API Overview
@@ -79,6 +82,8 @@ Commands:
 
 - `admin_token` and `submit_token` are path tokens; they can appear in access logs.
 - Public `/submit/:client/:external_id/token` should be rate-limited in production.
+- `builder.html` requires `?token=<admin_token>`.
+- `form.html` can load by `?token=<submit_token>` or `?client=<name>&id=<external_id>`.
 
 ## License
 

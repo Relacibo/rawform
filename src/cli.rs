@@ -15,6 +15,28 @@ pub async fn create_client(pool: &SqlitePool, name: &str) -> anyhow::Result<()> 
     Ok(())
 }
 
+pub async fn list_forms(
+    pool: &SqlitePool,
+    client: Option<&str>,
+    client_id: Option<i64>,
+    name: Option<&str>,
+) -> anyhow::Result<()> {
+    let rows = forms::list(pool, client, client_id, name).await?;
+    if rows.is_empty() {
+        println!("No forms found.");
+        return Ok(());
+    }
+
+    for row in rows {
+        println!(
+            "{:>4}  client_id={}  client={}  external_id={}  active={}",
+            row.id, row.client_id, row.client_name, row.external_id, row.is_active
+        );
+    }
+
+    Ok(())
+}
+
 pub async fn create_form(
     pool: &SqlitePool,
     client_name: &str,

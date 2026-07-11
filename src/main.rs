@@ -53,6 +53,28 @@ enum Command {
         #[arg(long)]
         webhook_url: Option<String>,
     },
+
+    /// List and search forms
+    Forms {
+        #[command(subcommand)]
+        command: FormsCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum FormsCommand {
+    /// List forms, optionally filter by client, client_id and external name
+    List {
+        /// Filter by client name
+        #[arg(long)]
+        client: Option<String>,
+        /// Filter by client id
+        #[arg(long)]
+        client_id: Option<i64>,
+        /// Filter by external form id/name
+        #[arg(long)]
+        name: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -91,6 +113,15 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
         }
+        Some(Command::Forms { command }) => match command {
+            FormsCommand::List {
+                client,
+                client_id,
+                name,
+            } => {
+                cli::list_forms(&pool, client.as_deref(), client_id, name.as_deref()).await?;
+            }
+        },
         None => {
             let addr: SocketAddr = format!("{}:{}", args.host, args.port).parse()?;
             tracing::info!("Listening on {addr}");

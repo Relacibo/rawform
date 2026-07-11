@@ -2,6 +2,17 @@ use sqlx::SqlitePool;
 
 use crate::models::Form;
 
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct FormSummary {
+    pub id: i64,
+    pub client_id: i64,
+    pub client_name: String,
+    pub external_id: String,
+    pub is_active: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 pub struct FormPatch {
     pub data: Option<String>,
     pub webhook_url: Option<Option<String>>,
@@ -51,6 +62,33 @@ pub async fn find_by_client_name_and_external(
     .bind(external_id)
     .fetch_optional(pool)
     .await
+}
+
+pub async fn list(
+    pool: &SqlitePool,
+    client_name: Option<&str>,
+    client_id: Option<i64>,
+    name: Option<&str>,
+) -> sqlx::Result<Vec<FormSummary>> {
+    let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+        "SELECT f.id, f.client_id, c.name AS client_name, f.external_id, f.is_active, f.created_at, f.updated_at \
+         FROM forms f JOIN clients c ON f.client_id = c.id WHERE 1=1",
+    );
+
+    if let Some(client_name) = client_name {
+        qb.push(" AND c.name = ").push_bind(client_name);
+    }
+    if let Some(client_id) = client_id {
+        qb.push(" AND f.client_id = ").push_bind(client_id);
+    }
+    if let Some(name) = name {
+        let pattern = format!("%{}%", name);
+        qb.push(" AND f.external_id LIKE ").push_bind(pattern);
+    }
+
+    qb.push(" ORDER BY c.name, f.external_id");
+
+    qb.build_query_as::<FormSummary>().fetch_all(pool).await
 }
 
 pub async fn find_by_admin_token(pool: &SqlitePool, token: &str) -> sqlx::Result<Option<Form>> {
