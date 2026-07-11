@@ -4,9 +4,9 @@ use crate::models::Form;
 
 /// Partial update payload. `None` means "leave unchanged".
 /// For `webhook_url`: `Some(None)` clears it, `Some(Some(url))` sets it.
-pub struct FormPatch<'a> {
-    pub data: Option<&'a str>,
-    pub webhook_url: Option<Option<&'a str>>,
+pub struct FormPatch {
+    pub data: Option<String>,
+    pub webhook_url: Option<Option<String>>,
     pub is_active: Option<bool>,
 }
 
@@ -131,13 +131,13 @@ pub async fn replace(
 }
 
 /// Partial update (PATCH). Only provided fields are changed.
-pub async fn patch(pool: &SqlitePool, id: i64, p: FormPatch<'_>) -> sqlx::Result<Form> {
+pub async fn patch(pool: &SqlitePool, id: i64, p: FormPatch) -> sqlx::Result<Form> {
     let current = find_by_id(pool, id).await?.ok_or(sqlx::Error::RowNotFound)?;
 
-    let data = p.data.unwrap_or(&current.data);
-    let webhook_url = match p.webhook_url {
+    let data = p.data.as_deref().unwrap_or(&current.data);
+    let webhook_url: Option<&str> = match &p.webhook_url {
         None => current.webhook_url.as_deref(),
-        Some(v) => v,
+        Some(v) => v.as_deref(),
     };
     let is_active = p.is_active.unwrap_or(current.is_active);
 

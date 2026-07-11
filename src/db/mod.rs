@@ -1,6 +1,5 @@
 pub mod clients;
 pub mod forms;
-pub mod submissions;
 
 use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 
@@ -17,9 +16,6 @@ pub async fn migrate(pool: &SqlitePool) -> anyhow::Result<()> {
         .execute(pool)
         .await?;
     sqlx::query(include_str!("../../migrations/002_create_forms.sql"))
-        .execute(pool)
-        .await?;
-    sqlx::query(include_str!("../../migrations/003_create_submissions.sql"))
         .execute(pool)
         .await?;
     Ok(())
