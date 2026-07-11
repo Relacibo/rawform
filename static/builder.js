@@ -1,10 +1,14 @@
 // rawform builder.js — minimal form builder UI
+// render() is only called for structural changes (add/delete/reorder/options).
+// Text field edits update state + targeted DOM nodes directly to preserve focus.
 
 const state = { elements: [] };
 
 function slugify(str) {
   return str.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 }
+
+// ── Structural mutations (trigger full re-render) ──────────────────────────
 
 function addElement(type) {
   const base = { id: crypto.randomUUID(), type, label: '', name: '', nameOverridden: false, required: false };
@@ -17,7 +21,8 @@ function addElement(type) {
     case 'dropdown':
       state.elements.push({ ...base, options: [] });
       break;
-    default: return;
+    default:
+      return;
   }
   render();
 }
@@ -35,19 +40,9 @@ function moveElement(id, dir) {
   render();
 }
 
-function updateField(id, field, value) {
-  const el = state.elements.find(e => e.id === id);
-  if (!el) return;
-  el[field] = value;
-  if (field === 'label' && !el.nameOverridden) {
-    el.name = slugify(value);
-  }
-  render();
-}
-
 function addOption(id) {
   const el = state.elements.find(e => e.id === id);
-  if (!el || !el.options) return;
+  if (!el?.options) return;
   el.options.push({ label: '', value: '', valueOverridden: false });
   render();
 }
@@ -59,6 +54,21 @@ function removeOption(id, idx) {
   render();
 }
 
+// ── In-place state updates (no re-render, targeted DOM patch) ─────────────
+
+/** Update a scalar field on an element. Syncs derived `name` field in DOM. */
+function updateField(id, field, value) {
+  const el = state.elements.find(e => e.id === id);
+  if (!el) return;
+  el[field] = value;
+  if (field === 'label' && !el.nameOverridden) {
+    el.name = slugify(value);
+    const nameInp = document.querySelector(`[data-el="${id}"][data-field="name"]`);
+    if (nameInp) nameInp.value = el.name;
+  }
+}
+
+/** Update a scalar field on a dropdown option. Syncs derived `value` in DOM. */
 function updateOption(id, idx, field, value) {
   const el = state.elements.find(e => e.id === id);
   if (!el) return;
@@ -66,27 +76,33 @@ function updateOption(id, idx, field, value) {
   opt[field] = value;
   if (field === 'label' && !opt.valueOverridden) {
     opt.value = slugify(value);
+    const valInp = document.querySelector(`[data-el="${id}"][data-opt="${idx}"][data-field="value"]`);
+    if (valInp) valInp.value = opt.value;
   }
-  render();
 }
 
-function makeField(label, input) {
+// ── DOM helpers ───────────────────────────────────────────────────────────
+
+function makeField(labelText, input) {
   const row = document.createElement('div');
   row.className = 'field-row';
   const lbl = document.createElement('label');
-  lbl.textContent = label;
+  lbl.textContent = labelText;
   row.appendChild(lbl);
   row.appendChild(input);
   return row;
 }
 
-function makeInput(type, value, onchange) {
+function makeInput(type, value, oninput) {
   const inp = document.createElement('input');
   inp.type = type;
-  if (type === 'checkbox') inp.checked = value;
-  else inp.value = value;
-  inp.addEventListener('change', e => onchange(type === 'checkbox' ? e.target.checked : e.target.value));
-  inp.addEventListener('input', e => { if (type !== 'checkbox') onchange(e.target.value); });
+  if (type === 'checkbox') {
+    inp.checked = value;
+    inp.addEventListener('change', e => oninput(e.target.checked));
+  } else {
+    inp.value = value;
+    inp.addEventListener('input', e => oninput(e.target.value));
+  }
   return inp;
 }
 
@@ -100,11 +116,24 @@ function makeNameRow(el) {
   const wrap = document.createElement('div');
   wrap.className = 'name-override';
 
-  const inp = makeInput('text', el.name, v => {
-    el.name = v;
-    el.nameOverridden = v !== '' && v !== slugify(el.label);
-  });
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = el.name;
   inp.placeholder = 'derived from label';
+  inp.dataset.el = el.id;
+  inp.dataset.field = 'name';
+
+  inp.addEventListener('input', e => {
+    el.name = e.target.value;
+    el.nameOverridden = e.target.value !== '' && e.target.value !== slugify(el.label);
+  });
+  inp.addEventListener('blur', () => {
+    if (inp.value === '') {
+      el.nameOverridden = false;
+      el.name = slugify(el.label);
+      inp.value = el.name;
+    }
+  });
 
   const resetBtn = document.createElement('button');
   resetBtn.textContent = '↺';
@@ -112,16 +141,7 @@ function makeNameRow(el) {
   resetBtn.addEventListener('click', () => {
     el.nameOverridden = false;
     el.name = slugify(el.label);
-    render();
-  });
-
-  // Reset on blur if empty
-  inp.addEventListener('blur', () => {
-    if (inp.value === '') {
-      el.nameOverridden = false;
-      el.name = slugify(el.label);
-      render();
-    }
+    inp.value = el.name;
   });
 
   wrap.appendChild(inp);
@@ -142,31 +162,40 @@ function makeOptionsBuilder(el) {
     const row = document.createElement('div');
     row.className = 'option-row';
 
-    const labelInp = makeInput('text', opt.label, v => updateOption(el.id, idx, 'label', v));
+    const labelInp = document.createElement('input');
+    labelInp.type = 'text';
+    labelInp.value = opt.label;
     labelInp.placeholder = 'Label';
+    labelInp.addEventListener('input', e => updateOption(el.id, idx, 'label', e.target.value));
 
-    const valueInp = makeInput('text', opt.value, v => {
-      el.options[idx].value = v;
-      el.options[idx].valueOverridden = v !== '' && v !== slugify(el.options[idx].label);
-    });
+    const valueInp = document.createElement('input');
+    valueInp.type = 'text';
+    valueInp.value = opt.value;
     valueInp.placeholder = 'value (derived)';
     valueInp.title = 'Override the submitted value';
+    valueInp.dataset.el = el.id;
+    valueInp.dataset.opt = idx;
+    valueInp.dataset.field = 'value';
+    valueInp.addEventListener('input', e => {
+      opt.value = e.target.value;
+      opt.valueOverridden = e.target.value !== '' && e.target.value !== slugify(opt.label);
+    });
+    valueInp.addEventListener('blur', () => {
+      if (valueInp.value === '') {
+        opt.valueOverridden = false;
+        opt.value = slugify(opt.label);
+        valueInp.value = opt.value;
+      }
+    });
 
     const resetBtn = document.createElement('button');
     resetBtn.textContent = '↺';
     resetBtn.className = 'remove-option';
     resetBtn.title = 'Reset value';
     resetBtn.addEventListener('click', () => {
-      el.options[idx].valueOverridden = false;
-      el.options[idx].value = slugify(el.options[idx].label);
-      render();
-    });
-    valueInp.addEventListener('blur', () => {
-      if (valueInp.value === '') {
-        el.options[idx].valueOverridden = false;
-        el.options[idx].value = slugify(el.options[idx].label);
-        render();
-      }
+      opt.valueOverridden = false;
+      opt.value = slugify(opt.label);
+      valueInp.value = opt.value;
     });
 
     const removeBtn = document.createElement('button');
@@ -190,11 +219,10 @@ function makeOptionsBuilder(el) {
   return container;
 }
 
-function renderCard(el, idx) {
+function renderCard(el) {
   const card = document.createElement('div');
   card.className = 'element-card';
 
-  // Header
   const header = document.createElement('div');
   header.className = 'card-header';
 
@@ -226,11 +254,11 @@ function renderCard(el, idx) {
   header.appendChild(deleteBtn);
   card.appendChild(header);
 
-  // Fields
   const fields = document.createElement('div');
   fields.className = 'fields';
 
-  fields.appendChild(makeField('Label', makeInput('text', el.label, v => updateField(el.id, 'label', v))));
+  const labelInp = makeInput('text', el.label, v => updateField(el.id, 'label', v));
+  fields.appendChild(makeField('Label', labelInp));
   fields.appendChild(makeNameRow(el));
 
   if (el.type === 'text' || el.type === 'textarea') {
@@ -243,8 +271,7 @@ function renderCard(el, idx) {
     fields.appendChild(makeOptionsBuilder(el));
   }
 
-  const reqInp = makeInput('checkbox', el.required, v => updateField(el.id, 'required', v));
-  fields.appendChild(makeField('Required', reqInp));
+  fields.appendChild(makeField('Required', makeInput('checkbox', el.required, v => updateField(el.id, 'required', v))));
 
   card.appendChild(fields);
   return card;
@@ -253,7 +280,7 @@ function renderCard(el, idx) {
 function render() {
   const builder = document.getElementById('builder');
   builder.innerHTML = '';
-  state.elements.forEach((el, idx) => builder.appendChild(renderCard(el, idx)));
+  state.elements.forEach(el => builder.appendChild(renderCard(el)));
 }
 
 function exportJSON() {
