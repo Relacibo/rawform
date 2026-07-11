@@ -158,6 +158,16 @@ function makeOptionsBuilder(el) {
   title.textContent = 'Options';
   container.appendChild(title);
 
+  // Column headers (shown once above the rows)
+  const headers = document.createElement('div');
+  headers.className = 'option-row option-headers';
+  ['Label', 'Value', '', ''].forEach(text => {
+    const s = document.createElement('span');
+    s.textContent = text;
+    headers.appendChild(s);
+  });
+  container.appendChild(headers);
+
   el.options.forEach((opt, idx) => {
     const row = document.createElement('div');
     row.className = 'option-row';
