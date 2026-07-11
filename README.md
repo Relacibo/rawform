@@ -29,11 +29,35 @@ A minimalist, self-hostable form builder with a REST API. Designed to integrate 
 cp .env.example .env
 # edit DATABASE_URL, HOST, PORT as needed
 
-# Create your first client and get its API key (shown once)
-cargo run -- create-client myapp
+# Create a client and get its API key (shown once)
+cargo run -- client myapp
+
+# Create a form (empty schema by default)
+cargo run -- form myapp contact-form --api-key rawform_...
+
+# Or: create a standalone definition first, then assign it
+cargo run -- definition myapp --api-key rawform_... --data '{"title":"Contact","elements":[]}'
+cargo run -- form myapp contact-form --api-key rawform_... --definition-id 1
 
 # Start the server
 cargo run
+```
+
+## CLI Reference
+
+```
+rawform [--database-url <URL>] [--host <HOST>] [--port <PORT>] [COMMAND]
+
+Commands:
+  client <name>
+    Create a new API client. Prints API key once.
+
+  definition <client_name> --api-key <key> [--data <json>]
+    Create a standalone form definition. Returns definition_id.
+
+  form <client_name> <external_id> --api-key <key>
+       [--data <json> | --definition-id <id>] [--webhook-url <url>]
+    Create a form instance. Prints admin_token, submit_token and URLs.
 ```
 
 ## API Overview
@@ -42,19 +66,20 @@ cargo run
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `PUT` | `/api/v1/forms/:client_name/:external_id` | Create or replace a form (new definition auto-created) |
+| `POST` | `/api/v1/definitions/:client_name` | Create a standalone definition, returns `definition_id` |
+| `DELETE` | `/api/v1/definitions/:client_name/:definition_id` | Delete a definition (fails if still assigned to a form) |
+| `PUT` | `/api/v1/forms/:client_name/:external_id` | Create or update a form — body: `{data}` or `{definition_id}` |
 | `GET` | `/api/v1/forms/:client_name/:external_id` | Get form with current definition |
-| `PATCH` | `/api/v1/forms/:client_name/:external_id` | Partial update (data, webhook_url, is_active) |
+| `PATCH` | `/api/v1/forms/:client_name/:external_id` | Partial update: `data`, `definition_id`, `webhook_url`, `is_active` |
 | `DELETE` | `/api/v1/forms/:client_name/:external_id` | Delete the form instance |
-| `DELETE` | `/api/v1/definitions/:client_name/:definition_id` | Delete a form definition (fails if still in use) |
 
 ### Admin token endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/admin/forms/:admin_token` | Get form with current definition |
-| `PUT` | `/api/v1/admin/forms/:admin_token` | Replace form data (new definition auto-created) |
-| `PATCH` | `/api/v1/admin/forms/:admin_token` | Partial update |
+| `PUT` | `/api/v1/admin/forms/:admin_token` | Replace form data (creates new definition) |
+| `PATCH` | `/api/v1/admin/forms/:admin_token` | Partial update: `data`, `webhook_url`, `is_active` |
 
 ### Public submit endpoints (no auth)
 
@@ -67,18 +92,28 @@ cargo run
 ## Typical Integration Flow
 
 ```
-1. Client creates/updates a form:
-   PUT /api/v1/forms/myapp/contact-form
-   Authorization: Bearer rawform_...
-   { "data": { "title": "Contact", "elements": [...] }, "webhook_url": "https://..." }
+# 1. Create a definition
+POST /api/v1/definitions/myapp
+Authorization: Bearer rawform_...
+{ "data": { "title": "Contact", "elements": [...] } }
+→ { "id": 5, ... }
 
-2. Frontend resolves the form (no auth needed):
-   GET /api/v1/submit/myapp/contact-form/token
-   → { "submit_token": "...", "data": { ... } }
+# 2. Create/update a form pointing to that definition
+PUT /api/v1/forms/myapp/contact-form
+{ "definition_id": 5, "webhook_url": "https://..." }
+→ { "admin_token": "...", "submit_token": "...", ... }
 
-3. Frontend renders and submits:
-   POST /api/v1/submit/<submit_token>
-   { "values": { "name": "Alice", "message": "Hello" } }
+# Publish: reassign production form to a new definition
+PATCH /api/v1/forms/myapp/contact-form
+{ "definition_id": 7 }
+
+# 3. Frontend resolves the form (no auth needed)
+GET /api/v1/submit/myapp/contact-form/token
+→ { "submit_token": "...", "data": { ... } }
+
+# 4. User submits
+POST /api/v1/submit/<submit_token>
+{ "values": { "name": "Alice", "message": "Hello" } }
 ```
 
 ## Security Notes
