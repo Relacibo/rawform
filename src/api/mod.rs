@@ -1,6 +1,5 @@
 pub mod admin;
 pub mod auth;
-pub mod definitions;
 pub mod forms;
 pub mod serde_util;
 pub mod submit;
@@ -23,15 +22,6 @@ pub fn router(pool: SqlitePool) -> Router {
         .route(
             "/forms/{client_name}/{external_id}",
             delete(forms::delete_form),
-        )
-        // Form definitions (client auth)
-        .route(
-            "/definitions/{client_name}",
-            post(definitions::create_definition),
-        )
-        .route(
-            "/definitions/{client_name}/{definition_id}",
-            delete(definitions::delete_definition),
         )
         // Admin token access
         .route("/admin/forms/{admin_token}", get(admin::get_form))

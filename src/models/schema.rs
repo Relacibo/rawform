@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// The JSON structure stored in form_definitions.data.
+/// The JSON structure stored in forms.data.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FormSchema {
     pub title: Option<String>,

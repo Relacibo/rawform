@@ -37,18 +37,6 @@ enum Command {
         name: String,
     },
 
-    /// Create a standalone form definition and print its ID
-    Definition {
-        /// Client name
-        client_name: String,
-        /// Client API key
-        #[arg(long)]
-        api_key: String,
-        /// Form schema as a JSON string (default: empty schema)
-        #[arg(long, default_value = "{}")]
-        data: String,
-    },
-
     /// Create a new form instance
     Form {
         /// Client name
@@ -58,12 +46,9 @@ enum Command {
         /// Client API key
         #[arg(long)]
         api_key: String,
-        /// Form schema as a JSON string (creates a new definition)
-        #[arg(long, conflicts_with = "definition_id")]
+        /// Form schema as a JSON string (default: {})
+        #[arg(long)]
         data: Option<String>,
-        /// Use an existing definition by ID
-        #[arg(long, conflicts_with = "data")]
-        definition_id: Option<i64>,
         /// Optional webhook URL called on each submission
         #[arg(long)]
         webhook_url: Option<String>,
@@ -89,19 +74,11 @@ async fn main() -> anyhow::Result<()> {
         Some(Command::Client { name }) => {
             cli::create_client(&pool, &name).await?;
         }
-        Some(Command::Definition {
-            client_name,
-            api_key,
-            data,
-        }) => {
-            cli::create_definition(&pool, &client_name, &api_key, &data).await?;
-        }
         Some(Command::Form {
             client_name,
             external_id,
             api_key,
             data,
-            definition_id,
             webhook_url,
         }) => {
             cli::create_form(
@@ -110,7 +87,6 @@ async fn main() -> anyhow::Result<()> {
                 &external_id,
                 &api_key,
                 data.as_deref(),
-                definition_id,
                 webhook_url.as_deref(),
             )
             .await?;

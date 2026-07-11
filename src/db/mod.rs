@@ -1,6 +1,5 @@
 pub mod clients;
-pub mod definitions;
-pub mod instances;
+pub mod forms;
 
 use sqlx::{
     SqlitePool,
@@ -31,12 +30,7 @@ pub async fn migrate(pool: &SqlitePool) -> anyhow::Result<()> {
     sqlx::query(include_str!("../../migrations/001_create_clients.sql"))
         .execute(pool)
         .await?;
-    sqlx::query(include_str!(
-        "../../migrations/002_create_form_definitions.sql"
-    ))
-    .execute(pool)
-    .await?;
-    sqlx::query(include_str!("../../migrations/003_create_forms.sql"))
+    sqlx::query(include_str!("../../migrations/002_create_forms.sql"))
         .execute(pool)
         .await?;
     Ok(())

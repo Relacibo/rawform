@@ -8,7 +8,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::SqlitePool;
 
-use crate::{db::instances, error::AppError, models::InstanceView};
+use crate::{db::forms, error::AppError, models::Form};
 
 #[derive(Deserialize)]
 pub struct ClientExternalPath {
@@ -29,7 +29,7 @@ pub async fn get_token(
         external_id,
     }): Path<ClientExternalPath>,
 ) -> Result<impl IntoResponse, AppError> {
-    let view = instances::find_by_client_name_and_external(&pool, &client_name, &external_id)
+    let view = forms::find_by_client_name_and_external(&pool, &client_name, &external_id)
         .await?
         .ok_or(AppError::NotFound)?;
     Ok(Json(json!({
@@ -43,7 +43,7 @@ pub async fn get_form(
     State(pool): State<SqlitePool>,
     Path(submit_token): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    let view = instances::find_by_submit_token(&pool, &submit_token)
+    let view = forms::find_by_submit_token(&pool, &submit_token)
         .await?
         .ok_or(AppError::NotFound)?;
     Ok(Json(json!({
@@ -60,7 +60,7 @@ pub async fn post_submit(
     Path(submit_token): Path<String>,
     Json(body): Json<SubmitBody>,
 ) -> Result<impl IntoResponse, AppError> {
-    let view = instances::find_by_submit_token(&pool, &submit_token)
+    let view = forms::find_by_submit_token(&pool, &submit_token)
         .await?
         .ok_or(AppError::NotFound)?;
 
@@ -74,7 +74,7 @@ pub async fn post_submit(
     ))
 }
 
-fn fire_webhook(url: String, view: &InstanceView, values: &Value) {
+fn fire_webhook(url: String, view: &Form, values: &Value) {
     let payload = json!({
         "event": "form.submission",
         "form_id": view.id,
