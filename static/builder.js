@@ -1,6 +1,7 @@
-// rawform builder.js
-// render() is only called for structural changes. Text edits patch DOM directly.
+// rawform builder.js — edit a form via admin_token from URL query param
+// render() is only called for structural changes; text edits patch DOM directly.
 
+const adminToken = new URLSearchParams(location.search).get('token');
 const state = { elements: [] };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -13,9 +14,7 @@ function buildSchema() {
   return {
     title: document.getElementById('form-title').value || null,
     elements: state.elements.map(({ id, nameOverridden, ...el }) => {
-      if (el.options) {
-        el.options = el.options.map(({ valueOverridden, ...opt }) => opt);
-      }
+      if (el.options) el.options = el.options.map(({ valueOverridden, ...o }) => o);
       return el;
     }),
   };
@@ -27,11 +26,64 @@ function loadFromSchema(schema) {
     ...el,
     id: crypto.randomUUID(),
     nameOverridden: true,
-    ...(el.options ? {
-      options: el.options.map(o => ({ ...o, valueOverridden: true })),
-    } : {}),
+    ...(el.options ? { options: el.options.map(o => ({ ...o, valueOverridden: true })) } : {}),
   }));
   render();
+}
+
+function setStatus(msg, isError = false) {
+  const el = document.getElementById('save-status');
+  el.textContent = msg;
+  el.className = isError ? 'status-error' : 'status-ok';
+}
+
+// ── API ────────────────────────────────────────────────────────────────────
+
+async function initPage() {
+  if (!adminToken) {
+    showError('No admin token in URL. Add ?token=<admin_token>');
+    return;
+  }
+  try {
+    const res = await fetch(`/api/v1/admin/forms/${encodeURIComponent(adminToken)}`);
+    if (res.status === 404) { showError('Form not found.'); return; }
+    if (!res.ok) { showError('Failed to load form.'); return; }
+    const json = await res.json();
+    document.getElementById('form-id-display').textContent = json.external_id;
+    const formUrl = `/form.html?token=${encodeURIComponent(json.submit_token)}`;
+    const link = document.getElementById('form-link-btn');
+    link.href = formUrl;
+    link.hidden = false;
+    loadFromSchema(json.data);
+  } catch {
+    showError('Network error.');
+  }
+}
+
+async function saveForm() {
+  setStatus('Saving…');
+  try {
+    const res = await fetch(`/api/v1/admin/forms/${encodeURIComponent(adminToken)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: buildSchema() }),
+    });
+    const json = await res.json();
+    if (!res.ok) { setStatus(json.error ?? 'Error', true); return; }
+    setStatus('Saved ✓');
+  } catch {
+    setStatus('Network error', true);
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('load-error');
+  el.textContent = msg;
+  el.hidden = false;
+  document.getElementById('form-meta').hidden = true;
+  document.getElementById('builder').hidden = true;
+  document.getElementById('add-element').hidden = true;
+  document.getElementById('actions').hidden = true;
 }
 
 // ── Structural mutations (trigger full re-render) ──────────────────────────
@@ -83,8 +135,8 @@ function updateField(id, field, value) {
   el[field] = value;
   if (field === 'label' && !el.nameOverridden) {
     el.name = slugify(value);
-    const nameInp = document.querySelector(`[data-el="${id}"][data-field="name"]`);
-    if (nameInp) nameInp.value = el.name;
+    const inp = document.querySelector(`[data-el="${id}"][data-field="name"]`);
+    if (inp) inp.value = el.name;
   }
 }
 
@@ -95,8 +147,8 @@ function updateOption(id, idx, field, value) {
   opt[field] = value;
   if (field === 'label' && !opt.valueOverridden) {
     opt.value = slugify(value);
-    const valInp = document.querySelector(`[data-el="${id}"][data-opt="${idx}"][data-field="value"]`);
-    if (valInp) valInp.value = opt.value;
+    const inp = document.querySelector(`[data-el="${id}"][data-opt="${idx}"][data-field="value"]`);
+    if (inp) inp.value = opt.value;
   }
 }
 
@@ -146,7 +198,7 @@ function makeNameRow(el) {
     el.nameOverridden = e.target.value !== '' && e.target.value !== slugify(el.label);
   });
   inp.addEventListener('blur', () => {
-    if (inp.value === '') {
+    if (!inp.value) {
       el.nameOverridden = false;
       el.name = slugify(el.label);
       inp.value = el.name;
@@ -199,7 +251,6 @@ function makeOptionsBuilder(el) {
     valueInp.type = 'text';
     valueInp.value = opt.value;
     valueInp.placeholder = 'derived';
-    valueInp.title = 'Override the submitted value';
     valueInp.dataset.el = el.id;
     valueInp.dataset.opt = idx;
     valueInp.dataset.field = 'value';
@@ -208,7 +259,7 @@ function makeOptionsBuilder(el) {
       opt.valueOverridden = e.target.value !== '' && e.target.value !== slugify(opt.label);
     });
     valueInp.addEventListener('blur', () => {
-      if (valueInp.value === '') {
+      if (!valueInp.value) {
         opt.valueOverridden = false;
         opt.value = slugify(opt.label);
         valueInp.value = opt.value;
@@ -254,14 +305,13 @@ function renderCard(el) {
 
   const orderBtns = document.createElement('div');
   orderBtns.className = 'order-btns';
-  const upBtn = document.createElement('button');
-  upBtn.textContent = '▲'; upBtn.title = 'Move up';
-  upBtn.addEventListener('click', () => moveElement(el.id, -1));
-  const downBtn = document.createElement('button');
-  downBtn.textContent = '▼'; downBtn.title = 'Move down';
-  downBtn.addEventListener('click', () => moveElement(el.id, 1));
-  orderBtns.appendChild(upBtn);
-  orderBtns.appendChild(downBtn);
+  ['▲', '▼'].forEach((t, i) => {
+    const btn = document.createElement('button');
+    btn.textContent = t;
+    btn.title = i === 0 ? 'Move up' : 'Move down';
+    btn.addEventListener('click', () => moveElement(el.id, i === 0 ? -1 : 1));
+    orderBtns.appendChild(btn);
+  });
 
   const typeLabel = document.createElement('span');
   typeLabel.className = 'type-label';
@@ -269,7 +319,8 @@ function renderCard(el) {
 
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'delete-btn';
-  deleteBtn.textContent = '✕'; deleteBtn.title = 'Delete element';
+  deleteBtn.textContent = '✕';
+  deleteBtn.title = 'Delete element';
   deleteBtn.addEventListener('click', () => removeElement(el.id));
 
   header.appendChild(orderBtns);
@@ -284,9 +335,9 @@ function renderCard(el) {
   fields.appendChild(makeNameRow(el));
 
   if (el.type === 'text' || el.type === 'textarea') {
-    const phInp = makeInput('text', el.placeholder, v => updateField(el.id, 'placeholder', v));
-    phInp.placeholder = 'Placeholder text';
-    fields.appendChild(makeField('Placeholder', phInp));
+    const ph = makeInput('text', el.placeholder, v => updateField(el.id, 'placeholder', v));
+    ph.placeholder = 'Placeholder text';
+    fields.appendChild(makeField('Placeholder', ph));
   }
 
   if (el.type === 'dropdown') fields.appendChild(makeOptionsBuilder(el));
@@ -302,7 +353,7 @@ function render() {
   state.elements.forEach(el => builder.appendChild(renderCard(el)));
 }
 
-// ── Preview ───────────────────────────────────────────────────────────────
+// ── Preview ────────────────────────────────────────────────────────────────
 
 function buildPreviewForm() {
   const form = document.getElementById('preview-form');
@@ -324,11 +375,7 @@ function buildPreviewForm() {
     } else {
       const lbl = document.createElement('label');
       lbl.textContent = el.label || el.name;
-      if (el.required) {
-        const req = document.createElement('span');
-        req.textContent = ' *'; req.className = 'preview-required';
-        lbl.appendChild(req);
-      }
+      if (el.required) { const r = document.createElement('span'); r.textContent = ' *'; r.className = 'preview-required'; lbl.appendChild(r); }
       group.appendChild(lbl);
 
       let inp;
@@ -358,78 +405,7 @@ function buildPreviewForm() {
   });
 }
 
-// ── API ───────────────────────────────────────────────────────────────────
-
-function connFields() {
-  return {
-    client: document.getElementById('client-name').value.trim(),
-    externalId: document.getElementById('external-id').value.trim(),
-    apiKey: document.getElementById('api-key').value.trim(),
-  };
-}
-
-function setStatus(msg, isError = false) {
-  const el = document.getElementById('save-status');
-  el.textContent = msg;
-  el.className = isError ? 'status-error' : 'status-ok';
-}
-
-function showTokens(adminToken, submitToken) {
-  document.getElementById('admin-token-val').textContent = adminToken;
-  document.getElementById('submit-token-val').textContent = submitToken;
-  document.getElementById('token-display').hidden = false;
-}
-
-async function saveForm() {
-  const { client, externalId, apiKey } = connFields();
-  if (!client || !externalId || !apiKey) {
-    setStatus('Fill in Client, Form ID and API Key', true); return;
-  }
-  setStatus('Saving…');
-  try {
-    const res = await fetch(`/api/v1/forms/${encodeURIComponent(client)}/${encodeURIComponent(externalId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ data: buildSchema() }),
-    });
-    const json = await res.json();
-    if (!res.ok) { setStatus(json.error ?? 'Error', true); return; }
-    setStatus('Saved ✓');
-    showTokens(json.admin_token, json.submit_token);
-  } catch (e) {
-    setStatus('Network error', true);
-  }
-}
-
-async function loadForm() {
-  const { client, externalId, apiKey } = connFields();
-  if (!client || !externalId || !apiKey) {
-    setStatus('Fill in Client, Form ID and API Key', true); return;
-  }
-  setStatus('Loading…');
-  try {
-    const res = await fetch(`/api/v1/forms/${encodeURIComponent(client)}/${encodeURIComponent(externalId)}`, {
-      headers: { 'Authorization': `Bearer ${apiKey}` },
-    });
-    const json = await res.json();
-    if (!res.ok) { setStatus(json.error ?? 'Error', true); return; }
-    loadFromSchema(json.data);
-    setStatus('Loaded ✓');
-    showTokens(json.admin_token, json.submit_token);
-  } catch (e) {
-    setStatus('Network error', true);
-  }
-}
-
-// ── Export JSON ───────────────────────────────────────────────────────────
-
-function exportJSON() {
-  const pre = document.getElementById('output');
-  pre.style.display = 'block';
-  pre.textContent = JSON.stringify(buildSchema(), null, 2);
-}
-
-// ── Event listeners ───────────────────────────────────────────────────────
+// ── Event listeners ────────────────────────────────────────────────────────
 
 document.getElementById('add-btn').addEventListener('click', () => {
   const sel = document.getElementById('element-type-select');
@@ -437,10 +413,12 @@ document.getElementById('add-btn').addEventListener('click', () => {
 });
 
 document.getElementById('save-btn').addEventListener('click', saveForm);
-document.getElementById('load-btn').addEventListener('click', loadForm);
-document.getElementById('export-btn').addEventListener('click', exportJSON);
+document.getElementById('export-btn').addEventListener('click', () => {
+  const pre = document.getElementById('output');
+  pre.style.display = 'block';
+  pre.textContent = JSON.stringify(buildSchema(), null, 2);
+});
 
-// Import dialog
 const importDialog = document.getElementById('import-dialog');
 document.getElementById('import-btn').addEventListener('click', () => {
   document.getElementById('import-error').textContent = '';
@@ -448,17 +426,14 @@ document.getElementById('import-btn').addEventListener('click', () => {
 });
 document.getElementById('import-cancel-btn').addEventListener('click', () => importDialog.close());
 document.getElementById('import-confirm-btn').addEventListener('click', () => {
-  const raw = document.getElementById('import-textarea').value;
   try {
-    const schema = JSON.parse(raw);
-    loadFromSchema(schema);
+    loadFromSchema(JSON.parse(document.getElementById('import-textarea').value));
     importDialog.close();
   } catch {
     document.getElementById('import-error').textContent = 'Invalid JSON';
   }
 });
 
-// Preview dialog
 const previewDialog = document.getElementById('preview-dialog');
 document.getElementById('preview-btn').addEventListener('click', () => {
   document.getElementById('preview-title').textContent =
@@ -468,14 +443,4 @@ document.getElementById('preview-btn').addEventListener('click', () => {
 });
 document.getElementById('preview-close-btn').addEventListener('click', () => previewDialog.close());
 
-// Copy buttons
-document.addEventListener('click', e => {
-  const btn = e.target.closest('.copy-btn');
-  if (!btn) return;
-  const text = document.getElementById(btn.dataset.target)?.textContent ?? '';
-  navigator.clipboard.writeText(text).then(() => {
-    const orig = btn.textContent;
-    btn.textContent = 'Copied!';
-    setTimeout(() => { btn.textContent = orig; }, 1500);
-  });
-});
+initPage();

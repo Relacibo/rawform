@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>rawform — builder</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>rawform <span class="header-sub">builder</span></h1>
+    <div id="header-meta">
+      <span id="form-id-display"></span>
+      <a id="form-link-btn" href="#" target="_blank" class="header-link" hidden>View form ↗</a>
+    </div>
+  </header>
+  <main>
+    <div id="load-error" class="page-error" hidden></div>
+
+    <div id="form-meta">
+      <label>Form title <input type="text" id="form-title" placeholder="Untitled form" /></label>
+    </div>
+
+    <div id="builder"></div>
+
+    <div id="add-element">
+      <select id="element-type-select">
+        <option value="">— Add element —</option>
+        <option value="text">Text input</option>
+        <option value="textarea">Textarea</option>
+        <option value="dropdown">Dropdown</option>
+        <option value="checkbox">Checkbox</option>
+      </select>
+      <button id="add-btn">Add</button>
+    </div>
+
+    <div id="actions">
+      <button id="save-btn">Save</button>
+      <button id="import-btn">Import JSON</button>
+      <button id="export-btn">Export JSON</button>
+      <button id="preview-btn">Preview</button>
+      <span id="save-status"></span>
+    </div>
+
+    <pre id="output"></pre>
+  </main>
+
+  <dialog id="import-dialog">
+    <h2>Import JSON</h2>
+    <textarea id="import-textarea" placeholder='{ "title": "...", "elements": [...] }'></textarea>
+    <p id="import-error" class="dialog-error"></p>
+    <div class="dialog-actions">
+      <button id="import-confirm-btn">Load</button>
+      <button id="import-cancel-btn">Cancel</button>
+    </div>
+  </dialog>
+
+  <dialog id="preview-dialog">
+    <h2 id="preview-title">Preview</h2>
+    <form id="preview-form" onsubmit="return false"></form>
+    <div class="dialog-actions">
+      <button id="preview-close-btn">Close</button>
+    </div>
+  </dialog>
+
+  <script src="/builder.js"></script>
+</body>
+</html>

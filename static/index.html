@@ -3,90 +3,38 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>rawform builder</title>
+  <title>rawform</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <header>
     <h1>rawform</h1>
-    <p class="subtitle">Minimalist form builder</p>
+    <p class="subtitle">Minimalist form builder — forms are created via API</p>
   </header>
-
   <main>
-    <!-- Connection -->
-    <section id="connection">
-      <div class="conn-fields">
-        <label>Client <input id="client-name" type="text" placeholder="myapp" /></label>
-        <label>Form ID <input id="external-id" type="text" placeholder="contact-form" /></label>
-        <label>API Key <input id="api-key" type="password" placeholder="rawform_..." /></label>
-      </div>
-      <div class="conn-actions">
-        <button id="load-btn">Load</button>
-        <button id="save-btn">Save</button>
-        <span id="save-status"></span>
-      </div>
-      <div id="token-display" hidden>
-        <div class="token-row">
-          <span class="token-label">Admin token</span>
-          <code id="admin-token-val"></code>
-          <button class="copy-btn" data-target="admin-token-val">Copy</button>
-        </div>
-        <div class="token-row">
-          <span class="token-label">Submit token</span>
-          <code id="submit-token-val"></code>
-          <button class="copy-btn" data-target="submit-token-val">Copy</button>
-        </div>
+    <section class="card">
+      <h2>Edit a form</h2>
+      <p class="card-desc">Enter the admin token you received when creating the form via API.</p>
+      <div class="open-row">
+        <input id="admin-token-input" type="text" placeholder="Admin token" />
+        <button id="open-builder-btn">Open editor ↗</button>
       </div>
     </section>
 
-    <!-- Form meta -->
-    <div id="form-meta">
-      <label>Form title <input type="text" id="form-title" placeholder="Untitled form" /></label>
-    </div>
-
-    <!-- Builder -->
-    <div id="builder"></div>
-
-    <div id="add-element">
-      <select id="element-type-select">
-        <option value="">— Add element —</option>
-        <option value="text">Text input</option>
-        <option value="textarea">Textarea</option>
-        <option value="dropdown">Dropdown</option>
-        <option value="checkbox">Checkbox</option>
-      </select>
-      <button id="add-btn">Add</button>
-    </div>
-
-    <div id="actions">
-      <button id="import-btn">Import JSON</button>
-      <button id="export-btn">Export JSON</button>
-      <button id="preview-btn">Preview</button>
-    </div>
-
-    <pre id="output"></pre>
+    <section class="card">
+      <h2>View a form</h2>
+      <p class="card-desc">Enter a submit token, or a client name + form ID.</p>
+      <div class="open-row">
+        <input id="submit-token-input" type="text" placeholder="Submit token" />
+        <button id="open-form-token-btn">Open form ↗</button>
+      </div>
+      <div class="open-row" style="margin-top: 0.5rem">
+        <input id="client-input" type="text" placeholder="Client name" style="max-width:160px" />
+        <input id="id-input" type="text" placeholder="Form ID" style="max-width:160px" />
+        <button id="open-form-id-btn">Open form ↗</button>
+      </div>
+    </section>
   </main>
-
-  <!-- Import dialog -->
-  <dialog id="import-dialog">
-    <h2>Import JSON</h2>
-    <textarea id="import-textarea" placeholder='{ "title": "...", "elements": [...] }'></textarea>
-    <p id="import-error" class="dialog-error"></p>
-    <div class="dialog-actions">
-      <button id="import-confirm-btn">Load</button>
-      <button id="import-cancel-btn">Cancel</button>
-    </div>
-  </dialog>
-
-  <!-- Preview dialog -->
-  <dialog id="preview-dialog">
-    <h2 id="preview-title">Preview</h2>
-    <form id="preview-form" onsubmit="return false"></form>
-    <div class="dialog-actions">
-      <button id="preview-close-btn">Close</button>
-    </div>
-  </dialog>
-
-  <script src="/builder.js"></script>
+  <script src="/index.js"></script>
 </body>
 </html>

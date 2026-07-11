@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>rawform</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main id="form-main">
+    <div id="form-loading">Loading…</div>
+    <div id="form-error" class="page-error" hidden></div>
+
+    <div id="form-container" hidden>
+      <h1 id="form-title-display"></h1>
+      <form id="submit-form" onsubmit="return false">
+        <div id="form-fields"></div>
+        <div id="form-actions">
+          <button type="submit" id="submit-btn">Submit</button>
+        </div>
+      </form>
+      <div id="submit-success" class="success-banner" hidden>
+        ✓ Your response has been submitted.
+      </div>
+    </div>
+  </main>
+  <script src="/form.js"></script>
+</body>
+</html>
