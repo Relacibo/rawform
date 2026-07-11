@@ -16,6 +16,7 @@ pub fn router(pool: SqlitePool) -> Router {
         .route("/admin/forms/:admin_token", put(admin::put_form))
         .route("/admin/forms/:admin_token", patch(admin::patch_form))
         // Form submission
+        .route("/submit/:submit_token", get(submit::get_form))
         .route("/submit/:submit_token", post(submit::post_submit))
         .with_state(pool)
 }

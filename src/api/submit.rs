@@ -15,6 +15,22 @@ pub struct SubmitBody {
     pub values: Value, // { field_name: value, ... }
 }
 
+pub async fn get_form(
+    State(pool): State<SqlitePool>,
+    Path(submit_token): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    let form = forms::find_by_submit_token(&pool, &submit_token)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    Ok(Json(json!({
+        "id": form.id,
+        "external_id": form.external_id,
+        "data": form.data_json()?,
+        "is_active": form.is_active,
+    })))
+}
+
 pub async fn post_submit(
     State(pool): State<SqlitePool>,
     Path(submit_token): Path<String>,
