@@ -2,19 +2,28 @@ pub mod clients;
 pub mod definitions;
 pub mod instances;
 
-use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
+use sqlx::{
+    SqlitePool,
+    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+};
+use std::str::FromStr;
 
 pub async fn connect(database_url: &str) -> anyhow::Result<SqlitePool> {
+    let opts = SqliteConnectOptions::from_str(database_url)?.create_if_missing(true);
+
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
         .after_connect(|conn, _| {
             Box::pin(async move {
-                sqlx::Executor::execute(&mut *conn, "PRAGMA foreign_keys = ON").await?;
+                sqlx::query("PRAGMA foreign_keys = ON")
+                    .execute(&mut *conn)
+                    .await?;
                 Ok(())
             })
         })
-        .connect(database_url)
+        .connect_with(opts)
         .await?;
+
     Ok(pool)
 }
 
