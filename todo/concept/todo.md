@@ -94,6 +94,7 @@ Each element has at minimum: `type`, `label`, `name` (slugified from label, over
 
 ### Documentation
 
-- [ ] **API reference** — OpenAPI spec or detailed README table with request/response examples
+- [ ] **Standalone definition endpoint** — `POST /api/v1/definitions/:client_name` creates a definition independently and returns `definition_id`. `PUT /forms/:client/:external_id` should accept either `data` (auto-creates definition) OR `definition_id` (uses existing). `PATCH /forms/:client/:external_id` should accept `definition_id` to reassign.
+- [ ] **Projects table** — `projects(id, client_id, name, admin_token, created_at)`. `form_definitions` gets `project_id` (nullable FK) and `tags` (JSON array, e.g. `["prod", "draft"]`). Endpoints: `POST/GET /api/v1/projects/:client_name`, `GET /api/v1/projects/:project_admin_token/definitions?tag=prod`. Enables listing all prod definitions of a project across forms.
 - [ ] **Activepieces integration example** — how to call rawform from an Activepieces flow
 - [ ] **Admin UI** — consider a simple admin page listing all forms for a client (accessible by api key)

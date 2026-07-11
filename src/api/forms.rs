@@ -25,16 +25,22 @@ pub struct FormPath {
     external_id: String,
 }
 
+/// PUT body: supply either `data` (auto-creates a new definition) or an
+/// existing `definition_id`. Exactly one must be present.
 #[derive(Deserialize)]
 pub struct PutFormBody {
-    pub data: Value,
+    pub data: Option<Value>,
+    pub definition_id: Option<i64>,
     #[serde(default, deserialize_with = "deserialize_maybe")]
     pub webhook_url: Option<Option<String>>,
 }
 
 #[derive(Deserialize)]
 pub struct PatchFormBody {
+    /// If set, creates a new definition and assigns it.
     pub data: Option<Value>,
+    /// If set, assigns an existing definition (must belong to same client).
+    pub definition_id: Option<i64>,
     #[serde(default, deserialize_with = "deserialize_maybe")]
     pub webhook_url: Option<Option<String>>,
     pub is_active: Option<bool>,
@@ -55,6 +61,38 @@ fn instance_json(v: &InstanceView) -> Result<Value, AppError> {
     }))
 }
 
+/// Resolve the definition_id from PUT/PATCH body: either use an existing one
+/// (verifying client ownership) or create a new one from `data`.
+async fn resolve_definition(
+    pool: &SqlitePool,
+    client_id: i64,
+    data: Option<&Value>,
+    definition_id: Option<i64>,
+) -> Result<i64, AppError> {
+    match (data, definition_id) {
+        (Some(d), None) => {
+            let json = serde_json::to_string(d).unwrap();
+            let def = definitions::insert(pool, client_id, &json).await?;
+            Ok(def.id)
+        }
+        (None, Some(id)) => {
+            let def = definitions::find_by_id(pool, id)
+                .await?
+                .ok_or(AppError::NotFound)?;
+            if def.client_id != client_id {
+                return Err(AppError::Unauthorized);
+            }
+            Ok(id)
+        }
+        (Some(_), Some(_)) => Err(AppError::BadRequest(
+            "Provide either 'data' or 'definition_id', not both.".into(),
+        )),
+        (None, None) => Err(AppError::BadRequest(
+            "Provide either 'data' or 'definition_id'.".into(),
+        )),
+    }
+}
+
 pub async fn put_form(
     State(pool): State<SqlitePool>,
     headers: HeaderMap,
@@ -65,8 +103,8 @@ pub async fn put_form(
     Json(body): Json<PutFormBody>,
 ) -> Result<impl IntoResponse, AppError> {
     let client = authenticate_client(&pool, &headers, &client_name).await?;
-    let data = serde_json::to_string(&body.data).unwrap();
-    let def = definitions::insert(&pool, client.id, &data).await?;
+    let def_id =
+        resolve_definition(&pool, client.id, body.data.as_ref(), body.definition_id).await?;
     let webhook_url = body.webhook_url.flatten();
     let admin_token = Uuid::new_v4().to_string();
     let submit_token = Uuid::new_v4().to_string();
@@ -74,7 +112,7 @@ pub async fn put_form(
         &pool,
         client.id,
         &external_id,
-        def.id,
+        def_id,
         &admin_token,
         &submit_token,
         webhook_url.as_deref(),
@@ -112,12 +150,27 @@ pub async fn patch_form(
         .await?
         .ok_or(AppError::NotFound)?;
 
-    let definition_id = if let Some(data_val) = &body.data {
-        let data = serde_json::to_string(data_val).unwrap();
-        let def = definitions::insert(&pool, client.id, &data).await?;
-        Some(def.id)
-    } else {
-        None
+    let definition_id = match (body.data.as_ref(), body.definition_id) {
+        (Some(_), Some(_)) => {
+            return Err(AppError::BadRequest(
+                "Provide either 'data' or 'definition_id', not both.".into(),
+            ));
+        }
+        (Some(d), None) => {
+            let json = serde_json::to_string(d).unwrap();
+            let def = definitions::insert(&pool, client.id, &json).await?;
+            Some(def.id)
+        }
+        (None, Some(id)) => {
+            let def = definitions::find_by_id(&pool, id)
+                .await?
+                .ok_or(AppError::NotFound)?;
+            if def.client_id != client.id {
+                return Err(AppError::Unauthorized);
+            }
+            Some(id)
+        }
+        (None, None) => None,
     };
 
     let updated = instances::patch(

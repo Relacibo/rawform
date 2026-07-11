@@ -26,6 +26,10 @@ pub fn router(pool: SqlitePool) -> Router {
         )
         // Form definitions (client auth)
         .route(
+            "/definitions/{client_name}",
+            post(definitions::create_definition),
+        )
+        .route(
             "/definitions/{client_name}/{definition_id}",
             delete(definitions::delete_definition),
         )
